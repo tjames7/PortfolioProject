@@ -1,0 +1,110 @@
+-- Cleaning Data with SQL Queries
+
+
+-- Populate Property address data
+SELECT * FROM housingdata;
+
+
+-- Find and remove Null data
+SELECT * FROM housingdata
+WHERE PropertyAddress IS NULL
+ORDER BY ParcelID;
+
+DELETE FROM housingdata
+WHERE propertyaddress IS NULL;
+
+-- Check that it's been cleared
+SELECT propertyaddress FROM housingdata
+WHERE propertyaddress IS NULL;
+
+-- Breaking out address into individual columns
+
+-- All addresses have a column after street name & before city
+-- Let's create two new columns that have address in one and city in the other for use
+-- We can even use Regex for this!
+SELECT 
+LEFT(propertyaddress, STRPOS(propertyaddress, ',') -1) AS Address,
+TRIM(SUBSTRING(propertyaddress, '[^,]*$'), ' ') AS City
+FROM housingdata;
+
+ALTER TABLE housingdata
+ADD PropertySplitAddress text;
+
+UPDATE housingdata
+SET PropertySplitAddress = LEFT(propertyaddress, STRPOS(propertyaddress, ',') -1);
+
+ALTER TABLE housingdata
+ADD PropertySplitCity text;
+
+UPDATE housingdata
+SET PropertySplitCity = TRIM(SUBSTRING(propertyaddress, '[^,]*$'), ' ');
+
+SELECT * FROM housingdata;
+
+
+-- Now let's break out the OwnerAddress the same way
+SELECT OwnerAddress FROM housingdata;
+
+SELECT
+SPLIT_PART(OwnerAddress, ',', 1),
+TRIM(SPLIT_PART(OwnerAddress, ',', 2), ' '),
+TRIM(SPLIT_PART(OwnerAddress, ',', 3), ' ')
+FROM housingdata;
+
+
+ALTER TABLE housingdata
+ADD OwnerSplitAddress text;
+
+UPDATE housingdata
+SET OwnerSplitAddress = SPLIT_PART(OwnerAddress, ',', 1);
+
+ALTER TABLE housingdata
+ADD OwnerSplitCity text;
+
+UPDATE housingdata
+SET OwnerSplitCity = TRIM(SPLIT_PART(OwnerAddress, ',', 2), ' ');
+
+ALTER TABLE housingdata
+ADD OwnerSplitState text;
+
+UPDATE housingdata
+SET OwnerSplitState = TRIM(SPLIT_PART(OwnerAddress, ',', 3), ' ');
+
+
+--Clean up SoldAsVacant column
+SELECT DISTINCT(SoldAsVacant), COUNT(SoldAsVacant)
+FROM housingdata
+GROUP BY SoldAsVacant
+ORDER BY 2;
+-- Answers range from Yes, Y, N, No
+
+SELECT SoldAsVacant,
+CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+	WHEN SoldAsVacant = 'N' THEN 'No'
+	ELSE SoldAsVacant
+	END
+FROM housingdata;
+
+UPDATE housingdata
+SET SoldAsVacant = CASE WHEN SoldAsVacant = 'Y' THEN 'Yes'
+	WHEN SoldAsVacant = 'N' THEN 'No'
+	ELSE SoldAsVacant
+	END;
+
+
+DELETE FROM housingdata
+WHERE ParcelID IN(SELECT ParcelID FROM(SELECT ParcelID, row_number() OVER(PARTITION BY ParcelID, PropertyAddress, SalePrice, SaleDate, LegalReference
+													   ORDER BY ParcelID)
+						  AS row_num FROM housingdata) t WHERE t.row_num > 1);
+
+
+-- Delete Unused Columns
+ALTER TABLE housingdata
+DROP COLUMN OwnerAddress, 
+DROP COLUMN TaxDistrict, 
+DROP COLUMN PropertyAddress;
+
+
+
+
+
